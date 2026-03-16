@@ -650,9 +650,15 @@ function selectWeek(mon,fri){
   document.getElementById('week-display-text').textContent=label;
   document.getElementById('f-title').value=`UX팀 ${label.split(' (')[0]} 주간보고서`;
   const info=document.getElementById('selected-week-info');
-  info.textContent=label; info.style.display='block';
-  document.getElementById('week-calendar').classList.remove('open');
+  if(info){info.textContent=label; info.style.display='block';}
+  const calEl=document.getElementById('week-calendar');
+  if(calEl) calEl.classList.remove('open');
   renderCalendar();
+  // 해당 주차 기존 보고서 있으면 팀원 데이터 로드
+  if(document.getElementById('member-write-sections')){
+    const existingReport=reports.find(r=>r.weekStart===mon);
+    renderMemberWriteSections(existingReport||null);
+  }
 }
 
 // ── 화면 이동
@@ -968,27 +974,38 @@ function initWriteForm(){
   const fri=new Date(mon); fri.setDate(mon.getDate()+4);
   selectWeek(formatDate(mon),formatDate(fri));
   // 공통 일정 권한
+  setCommonEditPermission();
+  // 이번 주 기존 보고서 불러오기
+  const existingReport=reports.find(r=>r.weekStart===formatDate(mon));
+  renderMemberWriteSections(existingReport||null);
+  loadCommonFromSheet();
+}
+
+function setCommonEditPermission(){
   const mirEl=document.getElementById('f-common-mir');
   const issueEl=document.getElementById('f-common-issue');
   const badge=document.getElementById('common-edit-badge');
+  if(!mirEl||!issueEl) return;
   if(currentUser.name===COMMON_EDITOR){
     mirEl.disabled=false; issueEl.disabled=false;
     mirEl.style.background=''; issueEl.style.background='';
     mirEl.style.color=''; issueEl.style.color='';
-    badge.textContent='✏️ 편집 가능';
-    badge.style.color='var(--primary)';
+    if(badge){badge.textContent='✏️ 편집 가능';badge.style.color='var(--primary)';}
   } else {
     mirEl.disabled=true; issueEl.disabled=true;
     mirEl.style.background='var(--gray-100)'; issueEl.style.background='var(--gray-100)';
     mirEl.style.color='var(--gray-600)'; issueEl.style.color='var(--gray-600)';
-    badge.textContent='시트에서 자동으로 불러옵니다';
-    badge.style.color='var(--gray-400)';
+    if(badge){badge.textContent='시트에서 자동으로 불러옵니다';badge.style.color='var(--gray-400)';}
   }
-  renderMemberWriteSections();
-  loadCommonFromSheet();
 }
 
-function renderMemberWriteSections(){
+// 주차 변경 시 해당 주차 기존 데이터 로드
+function onWeekChangeLoadData(mon, fri){
+  const existingReport=reports.find(r=>r.weekStart===mon);
+  renderMemberWriteSections(existingReport||null);
+}
+
+function renderMemberWriteSections(existingReport){
   const container=document.getElementById('member-write-sections');
   if(!container) return;
   const sorted=[...users].sort((a,b)=>a.name.localeCompare(b.name,'ko'));
@@ -999,6 +1016,10 @@ function renderMemberWriteSections(){
   container.innerHTML=sorted.map(u=>{
     const isMe=u.id===currentUser.id;
     const avatarColor=isMe?'var(--primary)':'var(--gray-400)';
+    // 기존 데이터 가져오기
+    const savedData=existingReport&&existingReport.memberData&&existingReport.memberData[u.id];
+    const savedMir=savedData?savedData.mir:(isMe?DEFAULT_MIR:'');
+    const savedIssue=savedData?savedData.issue:'';
     return `<div class="write-card" id="member-card-${u.id}">
       <div class="member-write-header" onclick="${isMe?'':('toggleMemberSection('+u.id+')')}">
         <div class="member-write-avatar" style="background:${avatarColor}">${u.name[0]}</div>
@@ -1011,13 +1032,13 @@ function renderMemberWriteSections(){
             <label class="write-label">MIR 2&3</label>
             <textarea id="mir-${u.id}" class="write-textarea" style="min-height:110px;${!isMe?'background:var(--gray-100);color:var(--gray-600);':''}"
               ${!isMe?'disabled':''}
-              placeholder="${isMe?'금주/차주 진행 업무를 입력하세요.':''}">${isMe?DEFAULT_MIR:''}</textarea>
+              placeholder="${isMe?'금주/차주 진행 업무를 입력하세요.':''}">${savedMir}</textarea>
           </div>
           <div>
             <label class="write-label">기타 이슈</label>
             <textarea id="issue-${u.id}" class="write-textarea" style="min-height:110px;${!isMe?'background:var(--gray-100);color:var(--gray-600);':''}"
               ${!isMe?'disabled':''}
-              placeholder="${isMe?'이슈 공유 및 협의 필요 사항을 입력하세요.':''}"></textarea>
+              placeholder="${isMe?'이슈 공유 및 협의 필요 사항을 입력하세요.':''}">${savedIssue}</textarea>
           </div>
         </div>
       </div>
@@ -1072,32 +1093,36 @@ async function submitToSheet(){
   btn.innerHTML='<div class="sheet-icon">⏳</div>저장 중...';
   btn.disabled=true;
 
-  const rid=Date.now();
-  // 멤버 데이터 수집
-  const memberData={};
-  users.forEach(u=>{
-    const mirEl=document.getElementById('mir-'+u.id);
-    const issueEl=document.getElementById('issue-'+u.id);
-    memberData[u.id]={mir:mirEl?mirEl.value:'',issue:issueEl?issueEl.value:''};
-  });
+  // ── 같은 주차 기존 보고서 찾기
+  const existingIdx=reports.findIndex(r=>r.weekStart===mon);
+  const existingReport=existingIdx>=0?reports[existingIdx]:null;
+
+  // 기존 memberData 유지하면서 내 데이터만 업데이트
+  const memberData=existingReport?{...existingReport.memberData}:{};
+  memberData[currentUser.id]={mir:myMir, issue:myIssue};
+
+  const rid=existingReport?existingReport.id:Date.now();
 
   // GAS 저장
   gasRequest({
-    action:'add',id:rid,title,weekStart:mon,weekEnd:fri,
-    author:currentUser.name,createdAt:new Date().toISOString().split('T')[0],
-    mir:myMir,issue:myIssue,commonMir,commonIssue
+    action:'add', id:rid, title, weekStart:mon, weekEnd:fri,
+    author:currentUser.name, createdAt:new Date().toISOString().split('T')[0],
+    mir:myMir, issue:myIssue, commonMir, commonIssue
   });
 
   // 공통 일정 저장 (전기철만)
   if(currentUser.name===COMMON_EDITOR){
-    gasRequest({action:'saveCommon',mir:commonMir,issue:commonIssue});
+    gasRequest({action:'saveCommon', mir:commonMir, issue:commonIssue});
   }
 
-  // 로컬 저장
-  const existing=reports.findIndex(r=>r.weekStart===mon&&r.author===currentUser.name);
-  const reportData={id:rid,weekStart:mon,weekEnd:fri,title,author:currentUser.name,memberData};
-  if(existing>=0) reports[existing]={...reports[existing],...reportData};
-  else reports.unshift(reportData);
+  // 로컬 저장 - 같은 주차면 병합, 없으면 새로 추가
+  const updatedReport={
+    id:rid, weekStart:mon, weekEnd:fri, title,
+    author:existingReport?existingReport.author:currentUser.name,
+    memberData
+  };
+  if(existingIdx>=0) reports[existingIdx]=updatedReport;
+  else reports.unshift(updatedReport);
   saveReports();
 
   btn.innerHTML='<div class="sheet-icon">G</div>저장하기';
