@@ -140,8 +140,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
 .filter-tab{padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--gray-500);transition:all .15s;font-family:'Noto Sans KR',sans-serif;font-weight:500;}
 .filter-tab.active,.filter-tab:hover{background:var(--primary);border-color:var(--primary);color:white;}
 .report-list{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);}
-.report-list-header{display:grid;grid-template-columns:200px 1fr 60px 90px 40px;padding:11px 20px;background:var(--gray-50);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:0.5px;text-transform:uppercase;}
-.report-item{display:grid;grid-template-columns:200px 1fr 60px 90px 40px;padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;align-items:center;}
+.report-list-header{display:grid;grid-template-columns:200px 1fr 100px 90px 40px;padding:11px 20px;background:var(--gray-50);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:0.5px;text-transform:uppercase;}
+.report-item{display:grid;grid-template-columns:200px 1fr 100px 90px 40px;padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;align-items:center;}
 .report-item:last-child{border-bottom:none;}
 .report-item:hover{background:var(--gray-50);}
 .report-date{font-size:13px;color:var(--gray-500);display:flex;align-items:center;gap:6px;}
@@ -1086,8 +1086,7 @@ function renderMemberWriteSections(existingReport){
           <div>
             <label class="write-label">MIR 2&3</label>
             <textarea id="mir-${u.id}" class="write-textarea" style="min-height:110px;${!isMe?'background:var(--gray-100);color:var(--gray-600);':''}"
-              ${!isMe?'disabled':''}
-              placeholder="${isMe?'금주/차주 진행 업무를 입력하세요.':''}">${savedMir}</textarea>
+              ${!isMe?'disabled':''}>${savedMir}</textarea>
           </div>
           <div>
             <label class="write-label">기타 이슈</label>
@@ -1158,9 +1157,13 @@ async function submitToSheet(){
 
   const rid=existingReport?existingReport.id:Date.now();
 
+  // 주차 라벨 (시트명으로 사용)
+  const weekLabel=document.getElementById('f-title').value.replace('UX팀 ','').replace(' 주간보고서','').trim()||mon;
+
   // GAS 저장
   gasRequest({
     action:'add', id:rid, title, weekStart:mon, weekEnd:fri,
+    weekLabel:weekLabel,
     author:currentUser.name, createdAt:new Date().toISOString().split('T')[0],
     mir:myMir, issue:myIssue, commonMir, commonIssue
   });
