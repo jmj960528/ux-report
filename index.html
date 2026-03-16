@@ -1181,8 +1181,8 @@ async function submitToSheet(){
 
   const rid=existingReport?existingReport.id:Date.now();
 
-  // 주차 라벨 (시트명으로 사용)
-  const weekLabel=document.getElementById('f-title').value.replace('UX팀 ','').replace(' 주간보고서','').trim()||mon;
+  // 시트명 = 해당 주차 금요일 날짜 (예: 2026-03-20)
+  const weekLabel=fri;
 
   // GAS 저장
   gasRequest({
