@@ -1142,13 +1142,24 @@ function loadCommonFromSheet(){
   const mirEl=document.getElementById('f-common-mir');
   const issueEl=document.getElementById('f-common-issue');
   if(!mirEl||!issueEl) return;
+
+  // 전기철이 아니면 비워두고 시트에서만 불러옴
+  if(currentUser.name!==COMMON_EDITOR){
+    mirEl.value=''; issueEl.value='';
+  }
+
   const cbName='cb_'+Date.now();
+  const script=document.createElement('script');
   window[cbName]=(data)=>{
     delete window[cbName];
-    if(mirEl.disabled){ mirEl.value=data.mir||''; issueEl.value=data.issue||'';}
-    document.body.removeChild(script);
+    // 헤더 텍스트 필터링
+    const mirVal=(data.mir||'').trim();
+    const issueVal=(data.issue||'').trim();
+    const skip=['MIR 2&3','MIR2&3','기타 이슈','기타이슈'];
+    mirEl.value=skip.includes(mirVal)?'':mirVal;
+    issueEl.value=skip.includes(issueVal)?'':issueVal;
+    if(script.parentNode) script.parentNode.removeChild(script);
   };
-  const script=document.createElement('script');
   script.src=`${GAS_URL}?action=getCommon&callback=${cbName}`;
   script.onerror=()=>{delete window[cbName];};
   setTimeout(()=>{if(window[cbName]){delete window[cbName];}},5000);
@@ -1192,8 +1203,8 @@ async function submitToSheet(){
     mir:myMir, issue:myIssue, commonMir, commonIssue
   });
 
-  // 공통 일정 저장 (전기철만)
-  if(currentUser.name===COMMON_EDITOR){
+  // 공통 일정 저장 (전기철만) - 별도 action으로 C1/C2에 저장
+  if(currentUser.name===COMMON_EDITOR && (commonMir||commonIssue)){
     gasRequest({action:'saveCommon', mir:commonMir, issue:commonIssue});
   }
 
