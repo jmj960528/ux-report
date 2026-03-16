@@ -274,6 +274,17 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
 .scroll-top-btn.visible{display:flex;}
 .scroll-top-btn:hover{background:var(--primary-light);transform:translateY(-2px);}
 .main-wrap{display:flex;flex-direction:column;flex:1;}
+
+/* 색상 변경 말풍선 */
+.color-picker-wrap{position:relative;}
+.color-bubble{position:absolute;bottom:calc(100% + 10px);left:0;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-lg);z-index:500;display:none;min-width:200px;}
+.color-bubble.open{display:block;}
+.color-bubble::after{content:'';position:absolute;bottom:-6px;left:20px;width:12px;height:12px;background:var(--white);border-right:1px solid var(--border);border-bottom:1px solid var(--border);transform:rotate(45deg);}
+.color-bubble-title{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px;}
+.color-swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.color-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0;}
+.color-swatch:hover{transform:scale(1.15);}
+.color-swatch.selected{border-color:var(--gray-800);transform:scale(1.1);}
 </style>
 </head>
 <body>
@@ -379,13 +390,19 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
         <div id="member-list"></div>
       </div>
     </div>
-    <div class="sidebar-user">
-      <div class="sidebar-user-avatar" id="user-avatar-list">U</div>
-      <div class="sidebar-user-info">
-        <div class="sidebar-user-name" id="user-name-list">사용자</div>
-        <div class="sidebar-user-role" id="user-role-list">로그인 중</div>
+    <div class="sidebar-user color-picker-wrap" id="color-picker-wrap-list">
+      <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;" onclick="toggleColorPicker('list')">
+        <div class="sidebar-user-avatar" id="user-avatar-list">U</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="user-name-list">사용자</div>
+          <div class="sidebar-user-role" id="user-role-list">로그인 중</div>
+        </div>
       </div>
       <button class="sidebar-logout" onclick="doLogout()">로그아웃</button>
+      <div class="color-bubble" id="color-bubble-list">
+        <div class="color-bubble-title">아바타 색상</div>
+        <div class="color-swatches" id="color-swatches-list"></div>
+      </div>
     </div>
   </aside>
   <main style="flex:1;display:flex;overflow:hidden;">
@@ -437,13 +454,19 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
         <div class="write-notice-body">• 주차 선택 시 제목 자동 생성<br>• 공통 일정은 시트에서 불러옴<br>• 저장 시 Sheets 자동 반영</div>
       </div>
     </div>
-    <div class="sidebar-user">
-      <div class="sidebar-user-avatar" id="user-avatar-write">U</div>
-      <div class="sidebar-user-info">
-        <div class="sidebar-user-name" id="user-name-write">사용자</div>
-        <div class="sidebar-user-role" id="user-role-write">로그인 중</div>
+    <div class="sidebar-user color-picker-wrap" id="color-picker-wrap-write">
+      <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;" onclick="toggleColorPicker('write')">
+        <div class="sidebar-user-avatar" id="user-avatar-write">U</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="user-name-write">사용자</div>
+          <div class="sidebar-user-role" id="user-role-write">로그인 중</div>
+        </div>
       </div>
       <button class="sidebar-logout" onclick="doLogout()">로그아웃</button>
+      <div class="color-bubble" id="color-bubble-write">
+        <div class="color-bubble-title">아바타 색상</div>
+        <div class="color-swatches" id="color-swatches-write"></div>
+      </div>
     </div>
   </aside>
   <main class="write-main" id="write-main">
@@ -752,7 +775,11 @@ function doLogout(){currentUser=null;localStorage.removeItem('uxr-user');showScr
 function updateUserUI(){
   if(!currentUser) return;
   const ini=currentUser.name?currentUser.name[0]:'U';
-  document.querySelectorAll('.sidebar-user-avatar').forEach(el=>el.textContent=ini);
+  const color=getUserColor();
+  document.querySelectorAll('.sidebar-user-avatar').forEach(el=>{
+    el.textContent=ini;
+    el.style.background=color;
+  });
   document.querySelectorAll('#user-name-list,#user-name-write').forEach(el=>el.textContent=currentUser.name);
   document.querySelectorAll('#user-role-list,#user-role-write').forEach(el=>el.textContent='@'+(currentUser.userId||'user'));
 }
@@ -892,8 +919,9 @@ function renderReports(list){
       writers.push({name:authorName,_color:colors[colorIdx]});
     }
     const avatarsHtml=writers.map(u=>{
-      const colorIdx=(u._color?0:u.name.charCodeAt(0)%colors.length);
-      const color=u._color||colors[colorIdx];
+      const savedColor=u.id?localStorage.getItem('uxr-color-'+u.id):null;
+      const colorIdx=u.name.charCodeAt(0)%colors.length;
+      const color=savedColor||(u._color||colors[colorIdx]);
       return `<div class="report-author-avatar" style="background:${color};margin-left:-4px;border:2px solid white;" title="${u.name}">${u.name[0]}</div>`;
     }).join('');
     return `<div class="report-item" onclick="openReport('${r.id}')">
@@ -1022,7 +1050,7 @@ function confirmReportDelete(){
 }
 
 // ── 작성 화면
-const DEFAULT_MIR='▶ 금주 진행 업무\n  ㆍ\n\n▶ 차주 진행 예정 업무\n  ㆍ';
+const DEFAULT_MIR='▶ 금주 진행 업무\nㆍ\n\n▶ 차주 진행 예정 업무\nㆍ';
 
 function initWriteForm(){
   if(!currentUser) return;
@@ -1086,18 +1114,28 @@ function renderMemberWriteSections(existingReport){
           <div>
             <label class="write-label">MIR 2&3</label>
             <textarea id="mir-${u.id}" class="write-textarea" style="min-height:110px;${!isMe?'background:var(--gray-100);color:var(--gray-600);':''}"
-              ${!isMe?'disabled':''}>${savedMir}</textarea>
+              ${!isMe?'disabled':''}></textarea>
           </div>
           <div>
             <label class="write-label">기타 이슈</label>
             <textarea id="issue-${u.id}" class="write-textarea" style="min-height:110px;${!isMe?'background:var(--gray-100);color:var(--gray-600);':''}"
               ${!isMe?'disabled':''}
-              placeholder="${isMe?'이슈 공유 및 협의 필요 사항을 입력하세요.':''}">${savedIssue}</textarea>
+              placeholder="${isMe?'이슈 공유 및 협의 필요 사항을 입력하세요.':''}"></textarea>
           </div>
         </div>
       </div>
     </div>`;
   }).join('');
+  // textarea value를 JS로 직접 세팅 (HTML 이스케이프 우회)
+  sorted.forEach(u=>{
+    const savedData=existingReport&&existingReport.memberData&&existingReport.memberData[u.id];
+    const savedMir=savedData?savedData.mir:(u.id===currentUser.id?DEFAULT_MIR:'');
+    const savedIssue=savedData?savedData.issue:'';
+    const mirEl=document.getElementById('mir-'+u.id);
+    const issueEl=document.getElementById('issue-'+u.id);
+    if(mirEl) mirEl.value=savedMir;
+    if(issueEl) issueEl.value=savedIssue;
+  });
 }
 
 function toggleMemberSection(uid){
@@ -1216,6 +1254,55 @@ function showToast(msg,isError){
   setTimeout(()=>t.classList.remove('show'),3500);
 }
 
+// ── 아바타 색상 변경
+const AVATAR_COLORS=[
+  '#2563EB','#7C3AED','#DB2777','#D97706','#059669','#DC2626',
+  '#0891B2','#65A30D','#EA580C','#6366F1','#0D9488','#9333EA',
+  '#BE123C','#1D4ED8','#15803D','#B45309','#7E22CE','#0E7490'
+];
+
+function getUserColor(){
+  if(!currentUser) return '#2563EB';
+  return localStorage.getItem('uxr-color-'+currentUser.id)||AVATAR_COLORS[currentUser.name.charCodeAt(0)%AVATAR_COLORS.length];
+}
+
+function toggleColorPicker(screen){
+  const bubble=document.getElementById('color-bubble-'+screen);
+  const isOpen=bubble.classList.contains('open');
+  // 모든 말풍선 닫기
+  document.querySelectorAll('.color-bubble').forEach(b=>b.classList.remove('open'));
+  if(!isOpen){
+    renderColorSwatches(screen);
+    bubble.classList.add('open');
+  }
+}
+
+function renderColorSwatches(screen){
+  const el=document.getElementById('color-swatches-'+screen);
+  if(!el) return;
+  const currentColor=getUserColor();
+  el.innerHTML=AVATAR_COLORS.map(c=>
+    `<div class="color-swatch ${c===currentColor?'selected':''}"
+      style="background:${c}"
+      onclick="setAvatarColor('${c}')"></div>`
+  ).join('');
+}
+
+function setAvatarColor(color){
+  if(!currentUser) return;
+  localStorage.setItem('uxr-color-'+currentUser.id, color);
+  // 유저 정보에도 저장
+  currentUser.color=color;
+  localStorage.setItem('uxr-user',JSON.stringify(currentUser));
+  const idx=users.findIndex(u=>u.id===currentUser.id);
+  if(idx>=0){users[idx].color=color; saveUsers();}
+  // 아바타 색상 업데이트
+  document.querySelectorAll('.sidebar-user-avatar').forEach(el=>el.style.background=color);
+  // 말풍선 닫기
+  document.querySelectorAll('.color-bubble').forEach(b=>b.classList.remove('open'));
+  showToast('색상이 변경되었습니다 🎨');
+}
+
 // 달력 외부 클릭 닫기
 document.addEventListener('click',e=>{
   const cal=document.getElementById('week-calendar');
@@ -1223,6 +1310,15 @@ document.addEventListener('click',e=>{
   if(cal&&!cal.contains(e.target)&&display&&!display.contains(e.target)){
     cal.classList.remove('open');
   }
+});
+
+// 말풍선 외부 클릭 닫기
+document.addEventListener('click',e=>{
+  const bubbles=document.querySelectorAll('.color-bubble');
+  const wraps=document.querySelectorAll('.color-picker-wrap');
+  let inside=false;
+  wraps.forEach(w=>{if(w.contains(e.target)) inside=true;});
+  if(!inside) bubbles.forEach(b=>b.classList.remove('open'));
 });
 
 // 초기화 - 로그인 유지
