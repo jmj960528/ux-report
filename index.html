@@ -877,13 +877,29 @@ function renderReports(list){
     const statusCls=status==='완료'?'status-done':'status-progress';
     const authorName=r.author||'?';
     const authorIni=authorName[0];
-    // 작성자 아바타 색상
     const colors=['#2563EB','#7C3AED','#DB2777','#D97706','#059669','#DC2626'];
-    const colorIdx=authorName.charCodeAt(0)%colors.length;
+    // memberData에서 작성한 팀원 목록 추출
+    const writers=[];
+    if(r.memberData){
+      users.forEach(u=>{
+        const d=r.memberData[u.id];
+        if(d&&(d.mir||d.issue)) writers.push(u);
+      });
+    }
+    // memberData 없으면 author만 표시
+    if(writers.length===0&&authorName){
+      const colorIdx=authorName.charCodeAt(0)%colors.length;
+      writers.push({name:authorName,_color:colors[colorIdx]});
+    }
+    const avatarsHtml=writers.map(u=>{
+      const colorIdx=(u._color?0:u.name.charCodeAt(0)%colors.length);
+      const color=u._color||colors[colorIdx];
+      return `<div class="report-author-avatar" style="background:${color};margin-left:-4px;border:2px solid white;" title="${u.name}">${u.name[0]}</div>`;
+    }).join('');
     return `<div class="report-item" onclick="openReport('${r.id}')">
       <div class="report-date"><div class="report-date-dot"></div>${dateLabel}</div>
       <div class="report-name">${r.title}</div>
-      <div><div class="report-author-avatar" style="background:${colors[colorIdx]}" title="${authorName}">${authorIni}</div></div>
+      <div style="display:flex;align-items:center;padding-left:4px;">${avatarsHtml}</div>
       <div><span class="report-status ${statusCls}">${status}</span></div>
       <button class="report-del-btn" onclick="openReportDeleteModal(event,'${r.id}')" title="보고서 삭제">🗑</button>
     </div>`;
