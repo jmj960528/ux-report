@@ -677,11 +677,13 @@ function selectWeek(mon,fri){
   const calEl=document.getElementById('week-calendar');
   if(calEl) calEl.classList.remove('open');
   renderCalendar();
-  // 먼저 로컬 데이터로 렌더링
-  const localReport=reports.find(r=>r.weekStart===mon);
-  renderMemberWriteSections(localReport||null);
-  // 시트에서 해당 주차 팀원 데이터 불러오기
-  loadWeekDataFromSheet(mon);
+  // 해당 주차 기존 보고서로 팀원 섹션 렌더링
+  if(document.getElementById('member-write-sections')){
+    const existingReport=reports.find(r=>r.weekStart===mon);
+    renderMemberWriteSections(existingReport||null);
+    // 시트에서 다른 팀원 데이터 불러오기 (내 데이터는 유지)
+    loadWeekDataFromSheet(mon);
+  }
 }
 
 function loadWeekDataFromSheet(weekStart){
@@ -689,35 +691,17 @@ function loadWeekDataFromSheet(weekStart){
   window[cbName]=(data)=>{
     delete window[cbName];
     if(!data||!data.data) return;
-    // 시트 데이터로 팀원별 textarea 업데이트
     users.forEach(u=>{
+      // 내 데이터는 건드리지 않음
+      if(u.id===currentUser.id) return;
       const sheetData=data.data[u.name];
       if(sheetData){
         const mirEl=document.getElementById('mir-'+u.id);
         const issueEl=document.getElementById('issue-'+u.id);
-        // 다른 팀원 데이터만 업데이트 (내 데이터는 로컬 우선)
-        if(u.id!==currentUser.id){
-          if(mirEl&&sheetData.mir) mirEl.value=sheetData.mir;
-          if(issueEl&&sheetData.issue) issueEl.value=sheetData.issue;
-        } else {
-          // 내 데이터도 시트에 있으면 불러오기 (로컬에 없는 경우)
-          const localReport=reports.find(r=>r.weekStart===weekStart);
-          const localMine=localReport&&localReport.memberData&&localReport.memberData[u.id];
-          if(!localMine&&mirEl&&sheetData.mir) mirEl.value=sheetData.mir;
-          if(!localMine&&issueEl&&sheetData.issue) issueEl.value=sheetData.issue;
-        }
-        // 로컬 memberData도 업데이트
-        const existingIdx=reports.findIndex(r=>r.weekStart===weekStart);
-        if(existingIdx>=0){
-          if(!reports[existingIdx].memberData) reports[existingIdx].memberData={};
-          if(!reports[existingIdx].memberData[u.id]){
-            reports[existingIdx].memberData[u.id]={mir:sheetData.mir||'',issue:sheetData.issue||''};
-            saveReports();
-          }
-        }
+        if(mirEl&&sheetData.mir) mirEl.value=sheetData.mir;
+        if(issueEl&&sheetData.issue) issueEl.value=sheetData.issue;
       }
     });
-    // 스크립트 제거
     const s=document.getElementById('wk-script');
     if(s) s.parentNode.removeChild(s);
   };
@@ -1227,23 +1211,26 @@ async function submitToSheet(){
   setTimeout(()=>showScreen('list'),1200);
 }
 
-// ── 스크롤
+// ── 스크롤 상단 버튼
 function scrollToTop(){
-  const main=document.querySelector('.list-main')||document.querySelector('.write-main');
+  const main=document.getElementById('write-main')||document.getElementById('list-panel');
   if(main) main.scrollTo({top:0,behavior:'smooth'});
   else window.scrollTo({top:0,behavior:'smooth'});
 }
-['list-main','write-main'].forEach(id=>{
+function setupScrollBtn(elId){
   setTimeout(()=>{
-    const el=document.getElementById(id);
+    const el=document.getElementById(elId);
     if(!el) return;
     el.addEventListener('scroll',()=>{
       const btn=document.getElementById('scroll-top-btn');
-      if(el.scrollTop>200) btn.classList.add('visible');
+      if(!btn) return;
+      if(el.scrollTop>150) btn.classList.add('visible');
       else btn.classList.remove('visible');
     });
   },500);
-});
+}
+setupScrollBtn('write-main');
+setupScrollBtn('list-panel');
 
 // ── Toast
 function showToast(msg,isError){
