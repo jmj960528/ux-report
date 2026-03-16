@@ -130,7 +130,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
 .member-delete:hover{background:#FEE2E2;color:#EF4444;}
 
 /* LIST */
-.list-main{flex:1;padding:28px 32px;overflow-y:auto;min-height:100vh;}
+.list-content-wrap{display:flex;flex:1;min-height:100vh;}
+.list-panel{flex:1;padding:28px 32px;overflow-y:auto;min-height:100vh;transition:all .3s;}
+.list-panel.with-preview{padding-right:20px;}
 .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
 .list-title{font-size:21px;font-weight:700;color:var(--gray-900);letter-spacing:-0.5px;}
 .list-title-sub{font-size:13px;color:var(--gray-400);margin-top:2px;}
@@ -416,7 +418,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--gray
       <div class="preview-body" id="preview-body"></div>
     </div>
   </div>
-  </main>
+</div>
 
 <!-- WRITE -->
 <div id="write" class="screen">
