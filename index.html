@@ -635,7 +635,19 @@ async function loadUsers() {
 async function loadReports() {
   try {
     const data = await gasCall({ action: 'getReports' });
-    reports = data.reports || [];
+    const raw = data.reports || [];
+    // 같은 weekStart 보고서 병합 (중복 방지)
+    const merged = {};
+    raw.forEach(r => {
+      const key = r.weekStart;
+      if (!merged[key]) {
+        merged[key] = { ...r, memberData: { ...(r.memberData || {}) } };
+      } else {
+        // memberData 병합
+        Object.assign(merged[key].memberData, r.memberData || {});
+      }
+    });
+    reports = Object.values(merged).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
   } catch(e) {
     reports = [];
   }
