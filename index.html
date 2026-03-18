@@ -623,7 +623,7 @@ function hideLoading() {
 async function loadUsers() {
   try {
     const data = await gasCall({ action: 'getUsers' });
-    users = (data.users || []).map(u => ({ ...u, id: Number(u.id) }));
+    users = (data.users || []).map(u => ({ ...u, id: String(u.id) }));
   } catch(e) {
     users = [];
   }
@@ -832,7 +832,7 @@ async function doSignup() {
   showLoading('회원가입 중...');
 
   try {
-    const id = Date.now();
+    const id = String(Date.now());
     const result = await gasCall({ action: 'addUser', id, name, userId, pw });
     if (result.result === 'duplicate') {
       errEl.style.display = 'block';
@@ -1366,7 +1366,7 @@ document.addEventListener('click', e => {
     showLoading('로그인 정보 확인 중...');
     try {
       await loadUsers();
-      const validUser = users.find(u => u.id === savedUser.id && u.userId === savedUser.userId);
+      const validUser = users.find(u => String(u.id) === String(savedUser.id) && u.userId === savedUser.userId);
       if (validUser) {
         currentUser = { ...validUser, color: savedUser.color || validUser.color };
         hideLoading();
